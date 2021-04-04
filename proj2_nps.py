@@ -14,6 +14,16 @@ CACHE_DICT = {}
 
 
 def load_cache():
+    '''
+    load cache
+    Parameters
+    ----------
+    None
+
+    Return
+    ----------
+    cache: dict
+    '''
     try:
         cache_file = open(CACHE_FILE_NAME, 'r')
         cache_file_contents = cache_file.read()
@@ -25,6 +35,17 @@ def load_cache():
 
 
 def save_cache(cache):
+    '''
+    Save cache
+
+    Parameters
+    ----------
+    None
+
+    Return
+    ---------
+    None
+    '''
     cache_file = open(CACHE_FILE_NAME, 'w')
     contents_to_write = json.dumps(cache)
     cache_file.write(contents_to_write)
@@ -32,6 +53,19 @@ def save_cache(cache):
 
 
 def make_url_request_using_cache(url, cache):
+    '''
+    check whether url have been scrapped or not,
+    if url is new, fetch and save cache
+    if not, use the caching data 
+
+    Parameters
+    ----------
+    url, cache
+
+    Returns
+    ----------
+    cache[url]: text 
+    '''
     if (url in cache.keys()): # the url is our unique key
         print("Using cache")
         return cache[url]
@@ -45,6 +79,19 @@ def make_url_request_using_cache(url, cache):
 
 
 def make_api_request_using_cache(url, cache):
+    '''
+    check whether url is new or not,
+    if url is new, use API Search and save cache
+    if not, use the caching data 
+    
+    Parameters
+    ----------
+    url, cache
+
+    Returns
+    ----------
+    cache[url]: dict
+    '''
     if (url in cache.keys()): # the url is our unique key
         print("Using cache")
         return cache[url]
@@ -113,9 +160,7 @@ def build_state_url_dict():
     Button = soup.find('div', class_='SearchBar-keywordSearch input-group input-group-lg')
     State_list = Button.find_all('a')
     for State in State_list:
-        #print(State['href']) 
-        #print(State.string) 
-        URL_DICT[State.string.lower()] = 'https://www.nps.gov' + State['href'] 
+        URL_DICT[State.string.lower()] = 'https://www.nps.gov' + State['href'] # 'michigan':'https://...'
     
     return URL_DICT
 
@@ -138,22 +183,22 @@ def get_site_instance(site_url):
     response = make_url_request_using_cache(site_url, CACHE_DICT)
     soup = BeautifulSoup(response, 'html.parser')
 
+    #category
     category = (soup.find('div', class_='Hero-designationContainer').find('span').string).strip()
-
+    #name
     name = (soup.find('div', class_='Hero-titleContainer clearfix').find('a').string).strip()
-
+    #address
     adr = soup.find('div',class_='mailing-address')
     if (adr is not None):
         addressLocality = adr.find('span',itemprop = 'addressLocality').string
         addressRegion = adr.find('span',itemprop = 'addressRegion').string
         address = addressLocality + ', ' + addressRegion
-
+    #zipcode
     zipcode = (soup.find('p',class_='adr').find('span',itemprop = 'postalCode').string).strip()
-
+    #phone
     phone = (soup.find('span',itemprop='telephone').string).strip()
-    #print(name,' ',category,' ',address,' ', zipcode,' ',phone)
 
-    #NationSite INSTANCE
+    # Create a NationSite INSTANCE
     site_instance = NationalSite(category, name, address, zipcode, phone)
     return site_instance
 
@@ -181,7 +226,7 @@ def get_sites_for_state(state_url):
 
     for PARK_parent_URL in PARK_parent_URLs: #for each site
         PARK_URL = 'https://www.nps.gov' + PARK_parent_URL.find('a')['href'] + 'index.htm' # site pages e.g. https://www.nps.gov/isro/index.htm
-        site_list.append(get_site_instance(PARK_URL)) #scrap the information
+        site_list.append(get_site_instance(PARK_URL)) #scrap the information, append to list
 
     return site_list
 
@@ -199,6 +244,7 @@ def get_nearby_places(site_object):
     dict
         a converted API return from MapQuest API
     '''
+    # url
     BASE_URL = 'http://www.mapquestapi.com/search/v2/radius?'
     key = secrets.API_KEY
     #origin = site_object.zipcode
@@ -209,13 +255,13 @@ def get_nearby_places(site_object):
     outFormat = 'json'
 
     url = BASE_URL+'&key='+key+'&origin='+origin+'&radius='+radius+'&maxMatches='+maxMatches+'&ambiguities='+ambiguities+'&outFormat='+outFormat
+    
+    # API result
     results = make_api_request_using_cache(url, CACHE_DICT)
-    '''
-    if (('searchResults' in results.keys()) is False):
-        return
-    '''
+    
     num = len(results['searchResults'])
     for i in range(num):
+        #find name, category, city from API results
         name = results['searchResults'][i]['name']
 
         category = results['searchResults'][i]['fields']['group_sic_code_name']
@@ -235,9 +281,10 @@ def get_nearby_places(site_object):
     
     return results
 
-CACHE_DICT = load_cache()
-URL_DICT = build_state_url_dict()
+CACHE_DICT = load_cache()  # init cache
+URL_DICT = build_state_url_dict() # create dictionary {'michigan':'https://...'}
 
+#PART 5: Interface
 while(1):
     state_name = input('Enter a state name (e.g. Michigan, michigan) or "exit" : ')
 
@@ -265,6 +312,8 @@ while(1):
             a = input('Choose the number for detail search or "exit" or "back" : ')
             if (a.isnumeric() is True):
                 if (int(a) <= len(site_list)):
+
+                    #[step4]
                     print("-----------------------------------")
                     print('Places near',site_list[int(a)-1].name)
                     print("-----------------------------------")
@@ -273,6 +322,8 @@ while(1):
                 else:
                     print('[Error] Invalid input')
                     print('')
+
+            #[step5]
             elif (a == 'exit'):
                 exit()
             elif ( a == 'back'):
